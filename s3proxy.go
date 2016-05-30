@@ -1,6 +1,7 @@
 package main
 
 import (
+	"errors"
 	"github.com/aws/aws-sdk-go/aws"
 	"github.com/aws/aws-sdk-go/aws/credentials"
 	"github.com/aws/aws-sdk-go/aws/credentials/ec2rolecreds"
@@ -9,12 +10,27 @@ import (
 	"github.com/aws/aws-sdk-go/service/s3"
 	"io"
 	"log"
+	"net/http"
 	"net/url"
 	"os"
+	"strings"
 )
 
 func parseUrl(u *url.URL) (region, bucket, path string, err error) {
-	return "us-west-2", "andrey-so-36323287", "/pi.conf", nil
+	log.Println(u.EscapedPath())
+	args := strings.SplitN(strings.TrimPrefix(u.EscapedPath(), "/"), "/", 3)
+	log.Println(args)
+	if len(args) < 3 {
+		return "", "", "", errors.New("Malformed path")
+	}
+	region = args[0]
+	bucket = args[1]
+	path = args[2]
+	if region == "" || bucket == "" || path == "" {
+		return "", "", "",
+			errors.New("Region, bucket and path should not be empty")
+	}
+	return
 }
 
 func getAWSConfig(region string) *aws.Config {
@@ -44,8 +60,13 @@ func getAWSConfig(region string) *aws.Config {
 	return conf
 }
 
-func main() {
-	region, bucket, path, err := parseUrl(nil)
+func serve(w http.ResponseWriter, r *http.Request) {
+	region, bucket, path, err := parseUrl(r.URL)
+	if err != nil {
+		log.Println("Cannot parse URL:", err)
+		http.NotFound(w, r)
+		return
+	}
 	config := getAWSConfig(region)
 	sess := session.New(config)
 	client := s3.New(sess)
@@ -53,9 +74,16 @@ func main() {
 		Bucket: aws.String(bucket),
 		Key:    aws.String(path),
 	}
-	resp, err := client.GetObject(req)
+	s3resp, err := client.GetObject(req)
 	if err != nil {
-		log.Fatalln("Cannot GetObject:", err)
+		log.Println("Cannot GetObject:", err)
+		http.NotFound(w, r)
+		return
 	}
-	_, err = io.Copy(os.Stdout, resp.Body)
+	_, err = io.Copy(w, s3resp.Body)
+}
+
+func main() {
+	http.HandleFunc("/", serve)
+	log.Fatal(http.ListenAndServe(":8080", nil))
 }
