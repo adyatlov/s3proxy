@@ -1,3 +1,3 @@
 # s3proxy
-Simple HTTP proxy to s3 bucket
+Simple HTTP server which proxies requests to a s3 bucket
 TODO: add usage
