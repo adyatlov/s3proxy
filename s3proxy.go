@@ -2,23 +2,22 @@ package main
 
 import (
 	"errors"
+	"fmt"
 	"github.com/aws/aws-sdk-go/aws"
 	"github.com/aws/aws-sdk-go/aws/credentials"
 	"github.com/aws/aws-sdk-go/aws/credentials/ec2rolecreds"
 	"github.com/aws/aws-sdk-go/aws/ec2metadata"
 	"github.com/aws/aws-sdk-go/aws/session"
 	"github.com/aws/aws-sdk-go/service/s3"
+	"github.com/valyala/fasthttp"
 	"io"
 	"log"
-	"net/http"
-	"net/url"
 	"os"
-	"strconv"
 	"strings"
 )
 
-func parseUrl(u *url.URL) (region, bucket, path string, err error) {
-	args := strings.SplitN(strings.TrimPrefix(u.EscapedPath(), "/"), "/", 3)
+func parseFullPath(fullPath string) (region, bucket, path string, err error) {
+	args := strings.SplitN(strings.TrimPrefix(fullPath, "/"), "/", 3)
 	if len(args) < 3 {
 		return "", "", "", errors.New("Malformed path")
 	}
@@ -59,12 +58,13 @@ func getAWSConfig(region string) *aws.Config {
 	return conf
 }
 
-func serve(w http.ResponseWriter, r *http.Request) {
-	log.Println("Downloading", r.URL.EscapedPath())
-	region, bucket, path, err := parseUrl(r.URL)
+func serve(ctx *fasthttp.RequestCtx) {
+	fullPath := string(ctx.Path())
+	log.Println("Downloading", fullPath)
+	region, bucket, path, err := parseFullPath(fullPath)
 	if err != nil {
 		log.Println("Cannot parse URL:", err)
-		http.NotFound(w, r)
+		ctx.SetStatusCode(fasthttp.StatusNotFound)
 		return
 	}
 	config := getAWSConfig(region)
@@ -77,39 +77,46 @@ func serve(w http.ResponseWriter, r *http.Request) {
 	s3resp, err := client.GetObject(req)
 	if err != nil {
 		log.Println("Cannot GetObject:", err)
-		http.NotFound(w, r)
+		ctx.SetStatusCode(fasthttp.StatusNotFound)
 		return
 	}
+	defer s3resp.Body.Close()
 
 	if s3resp.ContentDisposition != nil {
-		w.Header().Add("Content-Disposition", *s3resp.ContentDisposition)
+		ctx.Response.Header.Set("Content-Disposition", *s3resp.ContentDisposition)
 	}
 	if s3resp.ContentEncoding != nil {
-		w.Header().Add("Content-Encoding", *s3resp.ContentEncoding)
+		ctx.Response.Header.Set("Content-Encoding", *s3resp.ContentEncoding)
 	}
 	if s3resp.ContentLanguage != nil {
-		w.Header().Add("Content-Language", *s3resp.ContentLanguage)
+		ctx.Response.Header.Set("Content-Language", *s3resp.ContentLanguage)
 	}
 	if s3resp.ContentLength != nil {
-		w.Header().Add("Content-Length", strconv.FormatInt(*s3resp.ContentLength, 10))
+		ctx.Response.Header.SetContentLength(int(*s3resp.ContentLength))
 	}
 	if s3resp.ContentRange != nil {
-		w.Header().Add("Content-Range", *s3resp.ContentRange)
+		ctx.Response.Header.Set("Content-Range", *s3resp.ContentRange)
 	}
 	if s3resp.ContentType != nil {
-		w.Header().Add("Content-Type", *s3resp.ContentType)
+		ctx.Response.Header.Set("Content-Type", *s3resp.ContentType)
 	}
 
-	nBytes, err := io.Copy(w, s3resp.Body)
-	s3resp.Body.Close()
-	log.Printf("%v: %v bytes are copied.\n", r.URL.EscapedPath(), nBytes)
+	nBytes, err := io.Copy(ctx.Response.BodyWriter(), s3resp.Body)
+	if err != nil {
+		log.Println("Error:", err)
+		ctx.Response.Reset()
+		ctx.SetStatusCode(fasthttp.StatusBadGateway)
+		ctx.SetContentType("text/plain; charset=utf8")
+		fmt.Fprintln(ctx, "Error:", err)
+		return
+	}
+	log.Printf("%v: %v bytes are copied.\n", fullPath, nBytes)
 }
 
 func main() {
-	http.HandleFunc("/", serve)
 	if len(os.Args) == 1 {
 		log.Fatalln("Port should be specified as a first argument.")
 	}
 	port := os.Args[1]
-	log.Fatal(http.ListenAndServe(":"+port, nil))
+	log.Fatal(fasthttp.ListenAndServe(":"+port, serve))
 }
