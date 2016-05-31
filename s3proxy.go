@@ -85,5 +85,9 @@ func serve(w http.ResponseWriter, r *http.Request) {
 
 func main() {
 	http.HandleFunc("/", serve)
-	log.Fatal(http.ListenAndServe(":8080", nil))
+	if len(os.Args) == 1 {
+		log.Fatalln("Port should be specified as a first argument.")
+	}
+	port := os.Args[1]
+	log.Fatal(http.ListenAndServe(":"+port, nil))
 }
