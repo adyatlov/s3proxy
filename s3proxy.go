@@ -17,9 +17,7 @@ import (
 )
 
 func parseUrl(u *url.URL) (region, bucket, path string, err error) {
-	log.Println(u.EscapedPath())
 	args := strings.SplitN(strings.TrimPrefix(u.EscapedPath(), "/"), "/", 3)
-	log.Println(args)
 	if len(args) < 3 {
 		return "", "", "", errors.New("Malformed path")
 	}
@@ -61,6 +59,7 @@ func getAWSConfig(region string) *aws.Config {
 }
 
 func serve(w http.ResponseWriter, r *http.Request) {
+	log.Println("Downloading", r.URL.EscapedPath())
 	region, bucket, path, err := parseUrl(r.URL)
 	if err != nil {
 		log.Println("Cannot parse URL:", err)
@@ -80,7 +79,9 @@ func serve(w http.ResponseWriter, r *http.Request) {
 		http.NotFound(w, r)
 		return
 	}
-	_, err = io.Copy(w, s3resp.Body)
+	nBytes, err := io.Copy(w, s3resp.Body)
+	s3resp.Body.Close()
+	log.Printf("%v: %v bytes are copied.\n", r.URL.EscapedPath(), nBytes)
 }
 
 func main() {
