@@ -13,6 +13,7 @@ import (
 	"net/http"
 	"net/url"
 	"os"
+	"strconv"
 	"strings"
 )
 
@@ -79,6 +80,26 @@ func serve(w http.ResponseWriter, r *http.Request) {
 		http.NotFound(w, r)
 		return
 	}
+
+	if s3resp.ContentDisposition != nil {
+		w.Header().Add("Content-Disposition", *s3resp.ContentDisposition)
+	}
+	if s3resp.ContentEncoding != nil {
+		w.Header().Add("Content-Encoding", *s3resp.ContentEncoding)
+	}
+	if s3resp.ContentLanguage != nil {
+		w.Header().Add("Content-Language", *s3resp.ContentLanguage)
+	}
+	if s3resp.ContentLength != nil {
+		w.Header().Add("Content-Length", strconv.FormatInt(*s3resp.ContentLength, 10))
+	}
+	if s3resp.ContentRange != nil {
+		w.Header().Add("Content-Range", *s3resp.ContentRange)
+	}
+	if s3resp.ContentType != nil {
+		w.Header().Add("Content-Type", *s3resp.ContentType)
+	}
+
 	nBytes, err := io.Copy(w, s3resp.Body)
 	s3resp.Body.Close()
 	log.Printf("%v: %v bytes are copied.\n", r.URL.EscapedPath(), nBytes)
