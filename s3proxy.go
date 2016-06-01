@@ -80,6 +80,7 @@ func serve(w http.ResponseWriter, r *http.Request) {
 		http.NotFound(w, r)
 		return
 	}
+	defer s3resp.Body.Close()
 
 	if s3resp.ContentDisposition != nil {
 		w.Header().Add("Content-Disposition", *s3resp.ContentDisposition)
@@ -101,7 +102,10 @@ func serve(w http.ResponseWriter, r *http.Request) {
 	}
 
 	nBytes, err := io.Copy(w, s3resp.Body)
-	s3resp.Body.Close()
+	if err != nil {
+		log.Println("Error occured during copying:", err)
+		return
+	}
 	log.Printf("%v: %v bytes are copied.\n", r.URL.EscapedPath(), nBytes)
 }
 
