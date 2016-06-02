@@ -11,12 +11,11 @@
   },
   "healthChecks": [
     {
-      "protocol": "COMMAND",
-      "command": {
-        "value": "curl -f -X GET http://$HOST:$PORT0/s3-region/bucket-name/path/to/file.txt"
-      },
+      "path": "http://$HOST:$PORT0//s3-region-name/s3-bucket-name/path/to/your/small_file.txt",
+      "protocol": "HTTP",
+      "portIndex": 0,
       "gracePeriodSeconds": 300,
-      "intervalSeconds": 300,
+      "intervalSeconds": 60,
       "timeoutSeconds": 20,
       "maxConsecutiveFailures": 3,
       "ignoreHttp1xx": false
