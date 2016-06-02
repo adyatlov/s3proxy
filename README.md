@@ -1,3 +1,6 @@
+# s3proxy
+Simple HTTP server which proxies requests to a Amazon Simple Storage Service. It allows legacy HTTP fetchers to download privately shared files from Amazon S3 buckets.
+
 ## Usage
 Use the following format in order to download a file from S3 bucket:
 
