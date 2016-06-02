@@ -11,7 +11,7 @@
   },
   "healthChecks": [
     {
-      "path": "http://$HOST:$PORT0//s3-region-name/s3-bucket-name/path/to/your/small_file.txt",
+      "path": "http://$HOST:$PORT0/s3-region-name/s3-bucket-name/path/to/your/small_file.txt",
       "protocol": "HTTP",
       "portIndex": 0,
       "gracePeriodSeconds": 300,
