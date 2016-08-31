@@ -2,7 +2,7 @@
 Simple HTTP server which proxies requests to Amazon Simple Storage Service. It allows legacy HTTP fetchers to download privately shared files from Amazon S3 buckets.
 
 ## Usage
-Use the following format in order to download a file from S3 bucket:
+Use the following URL format to download a file from S3 bucket over s3proxy:
 
 ```bash
 $ curl http://localhost:8080/s3-region-name/s3-bucket-name/path/to/your/file.txt
